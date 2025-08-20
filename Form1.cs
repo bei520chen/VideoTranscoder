@@ -23,6 +23,7 @@ namespace VideoConverter
         private Button btnConvert;
         private OpenFileDialog openFileDialog;
         private SaveFileDialog saveFileDialog;
+        private ProgressBar progressBar;
 
         private void InitializeComponent()
         {
@@ -45,9 +46,21 @@ namespace VideoConverter
             this.Controls.Add(btnBrowseOutput);
             this.Controls.Add(btnConvert);
 
+            this.progressBar = new ProgressBar
+            {
+                Left = 20,
+                Top = 140,
+                Width = 390,
+                Height = 20,
+                Minimum = 0,
+                Maximum = 100,
+                Value = 0
+            };
+            this.Controls.Add(progressBar);
+
             this.Text = "视频转换工具";
             this.Width = 450;
-            this.Height = 200;
+            this.Height = 220; // 增加高度以容纳进度条
         }
 
         private void BtnBrowseInput_Click(object sender, EventArgs e)
@@ -87,23 +100,48 @@ namespace VideoConverter
                 }
                 string vf = "scale='if(lt(iw,ih),1080,-2)':'if(lt(iw,ih),-2,1080)',format=yuv420p";
 
-                await FFMpegArguments
+                // 显示进度条
+                progressBar.Visible = true;
+                progressBar.Value = 0;
+
+                var conversion = FFMpegArguments
                     .FromFileInput(txtInput.Text)
                     .OutputToFile(txtOutput.Text, true, options => options
                         .WithVideoCodec("libx264")
-                         .WithAudioCodec("aac")
-                         .WithAudioBitrate(128_000)
+                        .WithAudioCodec("aac")
+                        .WithAudioBitrate(128_000)
                         .WithCustomArgument($"-vf \"{vf}\"")
                         .WithFramerate(30)
-                    )
-                    .ProcessAsynchronously();
+                    );
 
+                conversion.NotifyOnProgress(percent =>
+                {
+                    int percentInt = (int)percent;
+                    if (percentInt > 100) percentInt = 100;
+                    if (percentInt < 0) percentInt = 0;
+                    if (progressBar.InvokeRequired)
+                    {
+                        progressBar.Invoke(() => progressBar.Value = percentInt);
+                    }
+                    else
+                    {
+                        progressBar.Value = percentInt;
+                    }
+                }, TimeSpan.FromMilliseconds(500));
+
+                await conversion.ProcessAsynchronously();
 
                 MessageBox.Show("转换完成！");
             }
             catch (Exception ex)
             {
                 MessageBox.Show("转换失败：" + ex.Message);
+            }
+            finally
+            {
+                // 隐藏进度条
+                progressBar.Visible = false;
+                progressBar.Value = 0;
             }
         }
     }
