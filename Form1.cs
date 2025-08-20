@@ -24,14 +24,63 @@ namespace VideoConverter
         private OpenFileDialog openFileDialog;
         private SaveFileDialog saveFileDialog;
         private ProgressBar progressBar;
+        private Label lblPercent; // 声明为类成员
 
         private void InitializeComponent()
         {
-            this.txtInput = new TextBox { Left = 20, Top = 20, Width = 300 };
-            this.btnBrowseInput = new Button { Left = 330, Top = 20, Width = 80, Text = "选择视频" };
-            this.txtOutput = new TextBox { Left = 20, Top = 60, Width = 300 };
-            this.btnBrowseOutput = new Button { Left = 330, Top = 60, Width = 80, Text = "输出路径" };
-            this.btnConvert = new Button { Left = 20, Top = 100, Width = 390, Text = "转换为1080P 30fps MP4" };
+            // 3D 边框样式
+            this.txtInput = new TextBox
+            {
+                Left = 130,
+                Top = 60,
+                Width = 270,
+                Font = new Font("微软雅黑", 10),
+                BorderStyle = BorderStyle.FixedSingle // 改为细边框，更简洁
+            };
+            this.btnBrowseInput = new Button
+            {
+                Left = 410,
+                Top = 57,
+                Width = 90,
+                Height = 32,
+                Text = "选择视频",
+                Font = new Font("微软雅黑", 10),
+                BackColor = Color.FromArgb(0, 120, 215),
+                ForeColor = Color.White,
+                FlatStyle = FlatStyle.Standard // 3D 按钮
+            };
+            this.txtOutput = new TextBox
+            {
+                Left = 130,
+                Top = 105,
+                Width = 270,
+                Font = new Font("微软雅黑", 10),
+                BorderStyle = BorderStyle.FixedSingle // 改为细边框，更简洁
+            };
+            this.btnBrowseOutput = new Button
+            {
+                Left = 410,
+                Top = 102,
+                Width = 90,
+                Height = 32,
+                Text = "输出路径",
+                Font = new Font("微软雅黑", 10),
+                BackColor = Color.FromArgb(0, 120, 215),
+                ForeColor = Color.White,
+                FlatStyle = FlatStyle.Standard // 3D 按钮
+            };
+            this.btnConvert = new Button
+            {
+                Left = 130,
+                Top = 155,
+                Width = 270,
+                Height = 40,
+                Text = "转换为1080P 30fps MP4",
+                Font = new Font("微软雅黑", 12, FontStyle.Bold),
+                BackColor = Color.FromArgb(0, 153, 51),
+                ForeColor = Color.White,
+                FlatStyle = FlatStyle.Popup // 立体感更强
+            };
 
             this.openFileDialog = new OpenFileDialog { Filter = "视频文件|*.mp4;*.avi;*.mkv;*.mov;*.flv;*.wmv" };
             this.saveFileDialog = new SaveFileDialog { Filter = "MP4文件|*.mp4" };
@@ -46,21 +95,81 @@ namespace VideoConverter
             this.Controls.Add(btnBrowseOutput);
             this.Controls.Add(btnConvert);
 
+            // 初始化进度条
             this.progressBar = new ProgressBar
             {
-                Left = 20,
-                Top = 140,
-                Width = 390,
-                Height = 20,
+                Left = 130,
+                Top = 215,
+                Width = 270,
+                Height = 22,
                 Minimum = 0,
                 Maximum = 100,
-                Value = 0
+                Value = 0,
+                Style = ProgressBarStyle.Continuous, // 平滑进度条
+                ForeColor = Color.FromArgb(0, 120, 215),
+                BackColor = Color.WhiteSmoke
             };
             this.Controls.Add(progressBar);
 
+            // 添加进度百分比标签
+            this.lblPercent = new Label
+            {
+                Left = this.progressBar.Left + this.progressBar.Width + 10,
+                Top = this.progressBar.Top - 2,
+                Width = 50,
+                Height = 24,
+                Text = "0%",
+                Font = new Font("微软雅黑", 10, FontStyle.Bold),
+                ForeColor = Color.FromArgb(0, 120, 215),
+                TextAlign = ContentAlignment.MiddleLeft
+            };
+            this.Controls.Add(lblPercent);
+
+            // 标签和标题去掉3D边框
+            var lblInput = new Label
+            {
+                Left = 20,
+                Top = 63,
+                Width = 110,
+                Text = "输入视频文件：",
+                Font = new Font("微软雅黑", 10, FontStyle.Bold),
+                ForeColor = Color.FromArgb(64, 64, 64),
+                BorderStyle = BorderStyle.None // 无边框
+            };
+            var lblOutput = new Label
+            {
+                Left = 20,
+                Top = 108,
+                Width = 110,
+                Text = "输出文件路径：",
+                Font = new Font("微软雅黑", 10, FontStyle.Bold),
+                ForeColor = Color.FromArgb(64, 64, 64),
+                BorderStyle = BorderStyle.None // 无边框
+            };
+            this.Controls.Add(lblInput);
+            this.Controls.Add(lblOutput);
+
+            var lblTitle = new Label
+            {
+                Left = 0,
+                Top = 10,
+                Width = 520,
+                Height = 40,
+                Text = "视频转换工具",
+                Font = new Font("微软雅黑", 14, FontStyle.Bold),
+                ForeColor = Color.FromArgb(0, 120, 215),
+                TextAlign = ContentAlignment.MiddleCenter,
+                BorderStyle = BorderStyle.None // 无边框
+            };
+            this.Controls.Add(lblTitle);
+
+            this.FormBorderStyle = FormBorderStyle.FixedDialog;
+            this.MaximizeBox = false;
             this.Text = "视频转换工具";
-            this.Width = 450;
-            this.Height = 220; // 增加高度以容纳进度条
+            this.Width = 530;
+            this.Height = 320;
+            this.StartPosition = FormStartPosition.CenterScreen;
+            this.BackColor = Color.White;
         }
 
         private void BtnBrowseInput_Click(object sender, EventArgs e)
@@ -119,17 +228,48 @@ namespace VideoConverter
                     int percentInt = (int)percent;
                     if (percentInt > 100) percentInt = 100;
                     if (percentInt < 0) percentInt = 0;
-                    if (progressBar.InvokeRequired)
+                    // 统一用主窗体的InvokeRequired判断
+                    if (this.InvokeRequired)
                     {
-                        progressBar.Invoke(() => progressBar.Value = percentInt);
+                        this.Invoke(() =>
+                        {
+                            progressBar.Value = percentInt;
+                            lblPercent.Text = percentInt + "%";
+                        });
                     }
                     else
                     {
                         progressBar.Value = percentInt;
+                        lblPercent.Text = percentInt + "%";
                     }
                 }, TimeSpan.FromMilliseconds(500));
 
                 await conversion.ProcessAsynchronously();
+
+                // 收尾阶段：显示“正在收尾...”并保持进度条100%
+                lblPercent.Text = "100%";
+                progressBar.Value = 100;
+
+                // 显示收尾提示
+                var lblFinishing = new Label
+                {
+                    Left = progressBar.Left,
+                    Top = progressBar.Top + progressBar.Height + 10,
+                    Width = 200,
+                    Height = 24,
+                    Text = "正在收尾，请稍候...",
+                    Font = new Font("微软雅黑", 10, FontStyle.Italic),
+                    ForeColor = Color.Gray,
+                    TextAlign = ContentAlignment.MiddleLeft
+                };
+                this.Controls.Add(lblFinishing);
+                this.Refresh();
+
+                // 可选：延迟一小段时间模拟收尾动画
+                await Task.Delay(600);
+
+                // 移除收尾提示
+                this.Controls.Remove(lblFinishing);
 
                 MessageBox.Show("转换完成！");
             }
