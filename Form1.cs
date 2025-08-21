@@ -69,7 +69,7 @@ namespace VideoConverter
         {
             Text = "素材转码助手";
             AutoScaleMode = AutoScaleMode.Dpi;
-            ClientSize = new Size(320, 500); // 固定客户区
+            ClientSize = new Size(350, 500); // 固定客户区
             MinimumSize = new Size(320 + (Width - ClientSize.Width), 500 + (Height - ClientSize.Height));
             MaximizeBox = false;
             StartPosition = FormStartPosition.CenterScreen;
@@ -195,12 +195,16 @@ namespace VideoConverter
                 Height = 40,
                 Text = "打开文件夹",
                 Radius = 6,
-                FillColor = Color.White,
-                FillHoverColor = Color.White,
-                FillPressColor = Color.White,
+                FillColor = Color.White,                // 正常背景
+                FillHoverColor = Color.White,           // 悬停背景 = 正常背景
+                FillPressColor = Color.White,           // 按下背景
                 RectColor = Color.FromArgb(203, 213, 225),
-                ForeColor = Color.FromArgb(51, 65, 85)
+                RectHoverColor = Color.FromArgb(203, 213, 225), // 悬停边框 = 普通边框
+                ForeColor = Color.FromArgb(51, 65, 85),         // 字体颜色
+                ForeHoverColor = Color.FromArgb(51, 65, 85),    // 悬停字体颜色
+                ForePressColor = Color.FromArgb(51, 65, 85)     // 按下字体颜色
             };
+
             btnOpenFolder.Click += (_, __) =>
             {
                 if (!string.IsNullOrEmpty(_currentBatchDir) && Directory.Exists(_currentBatchDir))
@@ -278,19 +282,23 @@ namespace VideoConverter
             dropPanel.Width = ClientSize.Width;
             dropPanel.Height = 468;
 
-            // 列表固定 248，高度不随窗体变化
+            // 列表容器
             contentPanel.Left = 0;
-            contentPanel.Top = 32;
+            contentPanel.Top = 32; // 保证在 headerPanel 下方
             contentPanel.Width = ClientSize.Width;
             contentPanel.Height = 468;
 
+            // 列表填满底部按钮上方空间
             listPanel.Left = 0;
             listPanel.Top = 0;
             listPanel.Width = contentPanel.Width;
-            listPanel.Height = 248;
+            listPanel.Height = Math.Max(0, contentPanel.Height - bottomPanel.Height);
+            listPanel.Anchor = AnchorStyles.Left | AnchorStyles.Top | AnchorStyles.Right | AnchorStyles.Bottom;
+            listPanel.AutoScroll = true; // 确保开启
 
+            // 底部条紧贴列表底部
             bottomPanel.Width = contentPanel.Width;
-            bottomPanel.Top = listPanel.Bottom; // 紧跟列表
+            bottomPanel.Top = listPanel.Bottom;
 
             // 表头按钮右对齐
             btnStart.Left = headerPanel.Width - btnStart.Width - 8;
@@ -587,12 +595,13 @@ namespace VideoConverter
         private void LayoutRows()
         {
             if (listPanel is null || listPanel.IsDisposed) return;
-            var y = 8 - listPanel.AutoScrollPosition.Y;
+
+            int y = 8; // 注意：不要再用 AutoScrollPosition.Y 抵消
             foreach (var job in _jobs)
             {
                 job.Row.Left = 8;
                 job.Row.Top = y;
-                job.Row.Width = listPanel.ClientSize.Width - 16; // 边距更紧凑
+                job.Row.Width = listPanel.ClientSize.Width - 16;
 
                 job.NameLabel.Width = job.Row.Width - 220;
                 job.Bar.Left = job.NameLabel.Left;
@@ -606,6 +615,9 @@ namespace VideoConverter
 
                 y += job.Row.Height + 8;
             }
+
+            // 设置滚动最小尺寸以触发滚动条
+            listPanel.AutoScrollMinSize = new Size(0, Math.Max(0, y));
         }
 
         private async void BtnStart_Click(object? sender, EventArgs e)
@@ -694,6 +706,12 @@ namespace VideoConverter
 
         private void ResetHeaderAfterTranscode()
         {
+            if (InvokeRequired)
+            {
+                Invoke((Action)ResetHeaderAfterTranscode);
+                return;
+            }
+
             var allDone = _jobs.All(j => j.StatusLabel.Text == "转码成功");
             _stage = allDone ? AppStage.AllDone : AppStage.ListReady;
 
