@@ -125,7 +125,7 @@ namespace VideoConverter
             headerPanel.Controls.Add(btnImportMore);
             headerPanel.Controls.Add(btnStart);
 
-            // 导入模式拖拽面板（全可操作区 320x468）
+            // 导入模式拖拽面板（保持不变）
             dropPanel = new UIPanel
             {
                 Left = 0,
@@ -163,7 +163,7 @@ namespace VideoConverter
             };
             dropPanel.Controls.Add(btnImportCentered);
 
-            // 列表 + 底部区（可操作区 320x468）
+            // 列表 + 底部区（保持容器高 468，不改变拖拽区）
             contentPanel = new UIPanel
             {
                 Left = 0,
@@ -175,16 +175,16 @@ namespace VideoConverter
                 Visible = false
             };
 
-            // 底部按钮条
+            // 底部按钮条（位置紧跟列表底部）
             bottomPanel = new UIPanel
             {
                 Left = 0,
                 Width = contentPanel.Width,
                 Height = 64,
-                Top = contentPanel.Height - 64,
+                Top = 248, // 先占位，LayoutContent 会重算
                 FillColor = Color.White,
                 RectColor = Color.Transparent,
-                Anchor = AnchorStyles.Left | AnchorStyles.Right | AnchorStyles.Bottom
+                Anchor = AnchorStyles.Left | AnchorStyles.Right | AnchorStyles.Top
             };
 
             btnOpenFolder = new UIButton
@@ -228,10 +228,10 @@ namespace VideoConverter
                 FillPressColor = Color.FromArgb(2, 132, 199),
                 ForeColor = Color.White
             };
-            // 右下角对齐
+            // 右上对齐到底部条
             btnUpload.Left = bottomPanel.Width - btnUpload.Width - 8;
             btnUpload.Top = 12;
-            btnUpload.Anchor = AnchorStyles.Right | AnchorStyles.Bottom;
+            btnUpload.Anchor = AnchorStyles.Right | AnchorStyles.Top;
 
             btnUpload.MouseEnter += async (_, __) => await ShowUploadMenuAsync();
             btnUpload.Click += async (_, __) => await ShowUploadMenuAsync();
@@ -239,17 +239,18 @@ namespace VideoConverter
             bottomPanel.Controls.Add(btnOpenFolder);
             bottomPanel.Controls.Add(btnUpload);
 
+            // 文件列表：固定高度 248，超出出现滚动条
             listPanel = new UIPanel
             {
                 Left = 0,
                 Top = 0,
                 Width = contentPanel.Width,
-                Height = contentPanel.Height - bottomPanel.Height,
+                Height = 248, // 固定 248
                 Radius = 6,
                 FillColor = Color.White,
                 RectColor = Color.FromArgb(220, 220, 220),
                 AutoScroll = true,
-                Anchor = AnchorStyles.Left | AnchorStyles.Top | AnchorStyles.Right | AnchorStyles.Bottom
+                Anchor = AnchorStyles.Left | AnchorStyles.Top | AnchorStyles.Right // 不跟随底部拉伸
             };
 
             contentPanel.Controls.Add(listPanel);
@@ -271,22 +272,27 @@ namespace VideoConverter
             headerPanel.Width = ClientSize.Width;
             headerPanel.Height = 32;
 
+            // 保持拖拽区域不变
             dropPanel.Left = 0;
             dropPanel.Top = 32;
             dropPanel.Width = ClientSize.Width;
             dropPanel.Height = 468;
 
+            // 列表固定 248，高度不随窗体变化
             contentPanel.Left = 0;
             contentPanel.Top = 32;
             contentPanel.Width = ClientSize.Width;
             contentPanel.Height = 468;
 
-            bottomPanel.Width = contentPanel.Width;
-            bottomPanel.Top = contentPanel.Height - bottomPanel.Height;
-
+            listPanel.Left = 0;
+            listPanel.Top = 0;
             listPanel.Width = contentPanel.Width;
-            listPanel.Height = contentPanel.Height - bottomPanel.Height;
+            listPanel.Height = 248;
 
+            bottomPanel.Width = contentPanel.Width;
+            bottomPanel.Top = listPanel.Bottom; // 紧跟列表
+
+            // 表头按钮右对齐
             btnStart.Left = headerPanel.Width - btnStart.Width - 8;
         }
 
@@ -461,7 +467,7 @@ namespace VideoConverter
             var rowPanel = new UIPanel
             {
                 Width = listPanel.ClientSize.Width - 24,
-                Height = 64,
+                Height = 36, // 每行 36px
                 Radius = 6,
                 FillColor = Color.White,
                 RectColor = Color.FromArgb(220, 220, 220)
@@ -470,7 +476,7 @@ namespace VideoConverter
             var picFile = new PictureBox
             {
                 Left = 10,
-                Top = 8,
+                Top = 10, // 居中 16x16
                 Width = 16,
                 Height = 16,
                 SizeMode = PictureBoxSizeMode.StretchImage,
@@ -480,20 +486,20 @@ namespace VideoConverter
             var lblName = new UILabel
             {
                 Left = picFile.Right + 8,
-                Top = 6,
+                Top = 8,
                 Width = rowPanel.Width - 220,
-                Height = 22,
+                Height = 18,
                 Text = $"{Path.GetFileName(inputPath)}",
-                Font = new Font("微软雅黑", 10.5F, FontStyle.Bold),
+                Font = new Font("微软雅黑", 9.5F, FontStyle.Bold),
                 ForeColor = Color.FromArgb(60, 63, 65)
             };
 
             var bar = new UIProcessBar
             {
                 Left = lblName.Left,
-                Top = 34,
+                Top = rowPanel.Height - 10, // 靠近底部
                 Width = rowPanel.Width - 220,
-                Height = 12,
+                Height = 8, // 压缩为 8px
                 Maximum = 100,
                 Value = 0,
                 Visible = false,
@@ -506,11 +512,11 @@ namespace VideoConverter
             var lblPercent = new UILabel
             {
                 Left = bar.Right + 10,
-                Top = bar.Top - 2,
+                Top = bar.Top - 1,
                 Width = 60,
-                Height = 20,
+                Height = 16,
                 Text = "0%",
-                Font = new Font("微软雅黑", 9F, FontStyle.Bold),
+                Font = new Font("微软雅黑", 8.5F, FontStyle.Bold),
                 ForeColor = Color.FromArgb(60, 63, 65),
                 Visible = false
             };
@@ -519,17 +525,17 @@ namespace VideoConverter
             {
                 Width = 16,
                 Height = 16,
-                Top = lblName.Top + 2,
+                Top = 10,
                 SizeMode = PictureBoxSizeMode.StretchImage
             };
 
             var lblStatus = new UILabel
             {
-                Top = lblName.Top,
+                Top = 8,
                 Width = 80,
-                Height = 20,
+                Height = 18,
                 Text = "等待中",
-                Font = new Font("微软雅黑", 9.5F, FontStyle.Regular),
+                Font = new Font("微软雅黑", 9F, FontStyle.Regular),
                 ForeColor = Color.FromArgb(148, 163, 184),
                 Cursor = Cursors.Default
             };
@@ -714,7 +720,7 @@ namespace VideoConverter
                 job.PercentLabel.Text = "0%";
                 job.PercentLabel.Visible = true;
             });
-                                                                
+
             try
             {
                 await _transcode.TranscodeAsync(
