@@ -29,6 +29,18 @@ namespace VideoConverter
         private UIPanel dropPanel = null!;
         private UIPanel listPanel = null!;
 
+        // 导入模式控件/状态
+        private UIButton btnImportCentered = null!;
+        private bool _dropHover = false;    
+        private bool _importMode = true;
+
+        // 初始化完成标志，防止构造期 OnResize 访问未初始化控件
+        private bool _uiReady = false;
+
+        // 导入图标图片缓存
+        private Image? _imgImportNormal;
+        private Image? _imgImportHover;
+
         // 允许的扩展名
         private static readonly HashSet<string> AllowedExt = new(StringComparer.OrdinalIgnoreCase)
             { ".mp4", ".avi", ".mkv", ".mov", ".flv", ".wmv" };
@@ -48,21 +60,25 @@ namespace VideoConverter
 
         private void InitializeComponent()
         {
-            Text = "视频转换工具";
-            Width = 720;
-            Height = 520;
+            Text = "素材转码助手";
+            Width = 320;     // 导入模式窗口宽
+            Height = 500;    // 导入模式窗口高
             MaximizeBox = false;
             StartPosition = FormStartPosition.CenterScreen;
             DoubleBuffered = true;
 
-            // 顶部按钮
+            // 默认背景色：白色
+            BackColor = Color.FromArgb(255, 255, 255);
+
+            // 顶部按钮（导入模式下先隐藏）
             btnImportMore = new UIButton
             {
                 Left = 40,
                 Top = 28,
                 Width = 120,
                 Height = 32,
-                Text = "继续导入"
+                Text = "继续导入",
+                Visible = false
             };
             btnStart = new UIButton
             {
@@ -71,7 +87,8 @@ namespace VideoConverter
                 Width = 120,
                 Height = 32,
                 Text = "开始转码",
-                Enabled = false
+                Enabled = false,
+                Visible = false
             };
             btnImportMore.Click += BtnImportMore_Click;
             btnStart.Click += BtnStart_Click;
@@ -83,23 +100,46 @@ namespace VideoConverter
             };
             saveFileDialog = new SaveFileDialog { Filter = "MP4文件|*.mp4" };
 
-            // 拖拽区域（仅用于提示与放置）
+            // 拖拽区域（导入模式：320x444，居中）
             dropPanel = new UIPanel
             {
-                Left = 40,
-                Top = 80,
-                Width = 630,
-                Height = 100,
+                Top = 12,
+                Width = 320, // 由 296 改为 320，以满足左右 120px 边距（虚线宽 296）
+                Height = 444,
                 Radius = 6,
                 FillColor = Color.White,
-                RectColor = Color.FromArgb(180, 180, 180)
+                RectColor = Color.FromArgb(180, 180, 180),
+                AllowDrop = true
             };
-            dropPanel.AllowDrop = true;
             dropPanel.DragEnter += DropPanel_DragEnter;
+            dropPanel.DragOver += DropPanel_DragOver;
+            dropPanel.DragLeave += DropPanel_DragLeave;
             dropPanel.DragDrop += DropPanel_DragDrop;
             dropPanel.Paint += DropPanel_Paint;
 
-            // 文件列表区域（滚动容器）
+            // 中间的“导入文件”按钮（#0284C7）
+            btnImportCentered = new UIButton
+            {
+                Text = "导入文件",
+                Width = 76,
+                Height = 32,
+                Radius = 4,
+                Top=10,
+                Font = new Font("微软雅黑", 10F, FontStyle.Bold),
+                ForeColor = Color.White,
+                FillColor = Color.FromArgb(2, 132, 199),
+                FillHoverColor = Color.FromArgb(14, 165, 233),
+                FillPressColor = Color.FromArgb(2, 132, 199),
+                RectColor = Color.Transparent
+            };
+            btnImportCentered.Click += (_, __) =>
+            {
+                if (openFileDialog.ShowDialog() == DialogResult.OK)
+                    AddFiles(openFileDialog.FileNames);
+            };
+            dropPanel.Controls.Add(btnImportCentered);
+
+            // 文件列表区域（导入模式下先隐藏）
             listPanel = new UIPanel
             {
                 Left = 40,
@@ -109,38 +149,185 @@ namespace VideoConverter
                 Radius = 6,
                 FillColor = Color.White,
                 RectColor = Color.FromArgb(220, 220, 220),
-                AutoScroll = true
+                AutoScroll = true,
+                Visible = false
             };
 
             Controls.Add(btnImportMore);
             Controls.Add(btnStart);
             Controls.Add(dropPanel);
             Controls.Add(listPanel);
+
+            _uiReady = true;
+
+            // 首次进入导入模式居中布局
+            CenterImportLayout();
+        }
+
+        private void CenterImportLayout()
+        {
+            if (!_importMode || !_uiReady) return;
+            if (dropPanel is null || btnImportCentered is null || dropPanel.IsDisposed || btnImportCentered.IsDisposed) return;
+
+            // 居中放置拖拽区域
+            var x = (ClientSize.Width - dropPanel.Width) / 2;
+            var y = (ClientSize.Height - dropPanel.Height) / 2;
+            dropPanel.Left = Math.Max(0, x);
+            dropPanel.Top = Math.Max(0, y);
+
+            // 虚线矩形（相对 dropPanel 客户区）
+            const int dashedPadding = 12;
+            int dashedLeft = dashedPadding;
+            int dashedRight = dropPanel.Width - dashedPadding;
+            int dashedWidth = dashedRight - dashedLeft;
+
+            // 导入文件按钮：水平居中；顶部 248px
+            int desiredTop = 248;
+            int desiredLeft = dashedLeft + (dashedWidth - btnImportCentered.Width) / 2;
+
+            // 边界保护
+            desiredTop = Math.Max(dashedPadding, Math.Min(desiredTop, dropPanel.Height - dashedPadding - btnImportCentered.Height));
+            desiredLeft = Math.Max(dashedLeft, Math.Min(desiredLeft, dashedRight - btnImportCentered.Width));
+
+            btnImportCentered.Top = desiredTop;
+            btnImportCentered.Left = desiredLeft;
+        }
+
+        private void EnterNormalModeLayout()
+        {
+            // 恢复到常规布局（原有 720x520 结构）
+            _importMode = false;
+            _dropHover = false;
+            dropPanel.FillColor = Color.White;
+
+            Width = 720;
+            Height = 520;
+
+            btnImportMore.Visible = true;
+            btnStart.Visible = true;
+
+            // 顶部按钮位置
+            btnImportMore.Left = 40;
+            btnImportMore.Top = 28;
+            btnStart.Left = btnImportMore.Right + 16;
+            btnStart.Top = 28;
+
+            // 顶部提示拖拽区域（100 高）
+            dropPanel.Width = ClientSize.Width - 80;
+            dropPanel.Height = 100;
+            dropPanel.Left = 40;
+            dropPanel.Top = 80;
+
+            // 列表区域靠下填充
+            listPanel.Visible = true;
+            listPanel.Left = 40;
+            listPanel.Top = dropPanel.Bottom + 16;
+            listPanel.Width = ClientSize.Width - 80;
+            listPanel.Height = ClientSize.Height - listPanel.Top - 40;
+
+            // 导入模式按钮隐藏
+            btnImportCentered.Visible = false;
+
+            dropPanel.Invalidate();
+            LayoutRows();
+        }
+
+        private void EnsureImportImagesLoaded()
+        {
+            if (_imgImportNormal != null && _imgImportHover != null) return;
+            try
+            {
+                var baseDir = AppDomain.CurrentDomain.BaseDirectory;
+                _imgImportNormal = Image.FromFile(Path.Combine(baseDir, "image", "img_drag_import.png"));
+                _imgImportHover = Image.FromFile(Path.Combine(baseDir, "image", "img_drag_import_activated.png"));
+            }
+            catch
+            {
+                // 忽略加载失败，绘制时做空值判断
+            }
         }
 
         private void DropPanel_Paint(object? sender, PaintEventArgs e)
         {
             var g = e.Graphics;
             g.SmoothingMode = SmoothingMode.AntiAlias;
+            g.TextRenderingHint = System.Drawing.Text.TextRenderingHint.ClearTypeGridFit;
 
-            using var pen = new Pen(Color.FromArgb(150, 150, 150), 2f) { DashStyle = DashStyle.Dash };
-            var rect = new Rectangle(4, 4, dropPanel.Width - 8, dropPanel.Height - 8);
-            g.DrawRectangle(pen, rect);
+            // Hover 填充色
+            dropPanel.FillColor = _dropHover ? Color.FromArgb(240, 249, 255) : Color.White; // #F0F9FF
 
-            var tip = "将视频文件拖拽到此处（可多选）";
-            var fmt = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center };
-            using var tipBrush = new SolidBrush(Color.FromArgb(110, 110, 110));
-            g.DrawString(tip, new Font("微软雅黑", 12F, FontStyle.Bold), tipBrush, rect, fmt);
+            // 虚线矩形：距边 12px
+            var borderColor = _dropHover ? Color.FromArgb(14, 165, 233) : Color.FromArgb(150, 150, 150);
+            var dashedRect = new Rectangle(12, 12, dropPanel.Width - 24, dropPanel.Height - 24);
+            using (var pen = new Pen(borderColor, 2f) { DashStyle = DashStyle.Dash })
+                g.DrawRectangle(pen, dashedRect);
+
+            if (_importMode)
+            {
+                // 图片：水平居中
+                EnsureImportImagesLoaded();
+                const int iconW = 56, iconH = 56;
+                int iconTop = 164;
+                int iconLeft = dashedRect.Left + (dashedRect.Width - iconW) / 2;
+                var iconRect = new Rectangle(iconLeft, iconTop, iconW, iconH);
+                var iconImg = _dropHover ? _imgImportHover : _imgImportNormal;
+                if (iconImg != null)
+                    g.DrawImage(iconImg, iconRect);
+
+                // 文案：左右居中，避免被按钮遮挡
+                var text = "拖拽视频文件或导入";
+                using var font = new Font("OPlusSans 3.0", 12f, FontStyle.Regular, GraphicsUnit.Point);
+                using var brush = new SolidBrush(Color.FromArgb(100, 116, 139));
+
+                float textHeight = 16f;
+                int gapBelowText = 8; // 文本底部与按钮顶部的安全间距
+                float defaultTop = iconRect.Bottom + 12;
+                // 按钮是子控件，会覆盖文本，确保文本底部 < 按钮顶部 - gap
+                float maxTop = btnImportCentered.Top - gapBelowText - textHeight;
+                float textTop = Math.Min(defaultTop, maxTop);
+                // 防御：若空间不足，仍不低于虚线顶
+                textTop = Math.Max(dashedRect.Top, textTop);
+
+                var textRect = new RectangleF(dashedRect.Left, textTop, dashedRect.Width, textHeight);
+                var sf = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center };
+                g.DrawString(text, font, brush, textRect, sf);
+            }
         }
 
         private void DropPanel_DragEnter(object? sender, DragEventArgs e)
         {
             if (e.Data != null && e.Data.GetDataPresent(DataFormats.FileDrop))
+            {
                 e.Effect = DragDropEffects.Copy;
+                _dropHover = true;
+                dropPanel.Invalidate();
+            }
+        }
+
+        private void DropPanel_DragOver(object? sender, DragEventArgs e)
+        {
+            if (e.Data != null && e.Data.GetDataPresent(DataFormats.FileDrop))
+            {
+                e.Effect = DragDropEffects.Copy;
+                if (!_dropHover)
+                {
+                    _dropHover = true;
+                    dropPanel.Invalidate();
+                }
+            }
+        }
+
+        private void DropPanel_DragLeave(object? sender, EventArgs e)
+        {
+            _dropHover = false;
+            dropPanel.Invalidate();
         }
 
         private void DropPanel_DragDrop(object? sender, DragEventArgs e)
         {
+            _dropHover = false;
+            dropPanel.Invalidate();
+
             if (e.Data == null) return;
             var files = (string[])e.Data.GetData(DataFormats.FileDrop);
             if (files?.Length > 0)
@@ -173,7 +360,15 @@ namespace VideoConverter
 
             if (addedAny)
             {
-                LayoutRows();
+                if (_importMode)
+                {
+                    // 第一次添加文件后退出导入模式，展示列表界面
+                    EnterNormalModeLayout();
+                }
+                else
+                {
+                    LayoutRows();
+                }
                 btnStart.Enabled = true;
             }
         }
@@ -266,7 +461,33 @@ namespace VideoConverter
         protected override void OnResize(EventArgs e)
         {
             base.OnResize(e);
-            if (listPanel is null || listPanel.IsDisposed) return; // 防御未初始化
+
+            // 构造期/未就绪时忽略布局，避免空引用
+            if (!_uiReady) return;
+
+            // 导入模式：确保拖拽区域与按钮保持居中
+            if (_importMode)
+            {
+                CenterImportLayout();
+                return;
+            }
+
+            // 常规模式：更新列表区域和拖拽区域宽度
+            if (listPanel is null || listPanel.IsDisposed) return; // 防御
+            var margin = 40;
+            if (dropPanel is not null && !dropPanel.IsDisposed)
+            {
+                dropPanel.Left = margin;
+                dropPanel.Top = 80;
+                dropPanel.Width = ClientSize.Width - margin * 2;
+                dropPanel.Height = 100;
+            }
+
+            listPanel.Left = margin;
+            listPanel.Top = dropPanel.Bottom + 16;
+            listPanel.Width = ClientSize.Width - margin * 2;
+            listPanel.Height = ClientSize.Height - listPanel.Top - margin;
+
             LayoutRows();
         }
 
@@ -279,6 +500,7 @@ namespace VideoConverter
                 job.Row.Left = 8;
                 job.Row.Top = y;
                 job.Row.Width = listPanel.ClientSize.Width - 24;
+                // 同步内部控件宽度
                 job.NameLabel.Width = job.Row.Width - 220;
                 job.Bar.Width = job.Row.Width - 220;
                 job.PercentLabel.Left = job.Bar.Right + 10;
