@@ -12,13 +12,17 @@ using System.Collections.Generic;
 
 namespace VideoConverter
 {
-    public partial class MainForm : UIForm
+    public partial class MainForm : UIForm  
     {
         public MainForm()
         {
             InitializeComponent();
             _transcode.ConfigureFFmpeg();
         }
+
+        // 统一进度条配色
+        private static readonly Color ProgressBarForeColor = Color.FromArgb(16, 185, 129);   // 前景（进度颜色）
+        private static readonly Color ProgressBarFillColor = Color.FromArgb(229, 231, 235);  // 背景
 
         // 顶部控件（表头内）
         private UIPanel headerPanel = null!;
@@ -82,7 +86,6 @@ namespace VideoConverter
                 Multiselect = true
             };
 
-            // 表头（32 高）- 放置继续导入/开始转码
             headerPanel = new UIPanel
             {
                 Left = 0,
@@ -92,7 +95,6 @@ namespace VideoConverter
                 FillColor = Color.White,
                 RectColor = Color.Transparent
             };
-            // 导入模式下隐藏表头（不显示“继续导入/开始转码”）
             headerPanel.Visible = false;
 
             btnImportMore = new UIButton
@@ -118,14 +120,12 @@ namespace VideoConverter
                 ForeColor = Color.White,
                 Top = 4
             };
-            // 右对齐
             btnStart.Anchor = AnchorStyles.Top | AnchorStyles.Right;
             btnStart.Click += BtnStart_Click;
 
             headerPanel.Controls.Add(btnImportMore);
             headerPanel.Controls.Add(btnStart);
 
-            // 导入模式拖拽面板（保持不变）
             dropPanel = new UIPanel
             {
                 Left = 0,
@@ -163,7 +163,6 @@ namespace VideoConverter
             };
             dropPanel.Controls.Add(btnImportCentered);
 
-            // 列表 + 底部区（保持容器高 468，不改变拖拽区）
             contentPanel = new UIPanel
             {
                 Left = 0,
@@ -175,13 +174,12 @@ namespace VideoConverter
                 Visible = false
             };
 
-            // 底部按钮条（位置紧跟列表底部）
             bottomPanel = new UIPanel
             {
                 Left = 0,
                 Width = contentPanel.Width,
                 Height = 64,
-                Top = 248, // 先占位，LayoutContent 会重算
+                Top = 248,
                 FillColor = Color.White,
                 RectColor = Color.Transparent,
                 Anchor = AnchorStyles.Left | AnchorStyles.Right | AnchorStyles.Top
@@ -195,16 +193,15 @@ namespace VideoConverter
                 Height = 40,
                 Text = "打开文件夹",
                 Radius = 6,
-                FillColor = Color.White,                // 正常背景
-                FillHoverColor = Color.White,           // 悬停背景 = 正常背景
-                FillPressColor = Color.White,           // 按下背景
+                FillColor = Color.White,
+                FillHoverColor = Color.White,
+                FillPressColor = Color.White,
                 RectColor = Color.FromArgb(203, 213, 225),
-                RectHoverColor = Color.FromArgb(203, 213, 225), // 悬停边框 = 普通边框
-                ForeColor = Color.FromArgb(51, 65, 85),         // 字体颜色
-                ForeHoverColor = Color.FromArgb(51, 65, 85),    // 悬停字体颜色
-                ForePressColor = Color.FromArgb(51, 65, 85)     // 按下字体颜色
+                RectHoverColor = Color.FromArgb(203, 213, 225),
+                ForeColor = Color.FromArgb(51, 65, 85),
+                ForeHoverColor = Color.FromArgb(51, 65, 85),
+                ForePressColor = Color.FromArgb(51, 65, 85)
             };
-
             btnOpenFolder.Click += (_, __) =>
             {
                 if (!string.IsNullOrEmpty(_currentBatchDir) && Directory.Exists(_currentBatchDir))
@@ -232,29 +229,26 @@ namespace VideoConverter
                 FillPressColor = Color.FromArgb(2, 132, 199),
                 ForeColor = Color.White
             };
-            // 右上对齐到底部条
             btnUpload.Left = bottomPanel.Width - btnUpload.Width - 8;
             btnUpload.Top = 12;
             btnUpload.Anchor = AnchorStyles.Right | AnchorStyles.Top;
-
             btnUpload.MouseEnter += async (_, __) => await ShowUploadMenuAsync();
             btnUpload.Click += async (_, __) => await ShowUploadMenuAsync();
 
             bottomPanel.Controls.Add(btnOpenFolder);
             bottomPanel.Controls.Add(btnUpload);
 
-            // 文件列表：固定高度 248，超出出现滚动条
             listPanel = new UIPanel
             {
                 Left = 0,
                 Top = 0,
                 Width = contentPanel.Width,
-                Height = 248, // 固定 248
+                Height = 248,
                 Radius = 6,
                 FillColor = Color.White,
                 RectColor = Color.FromArgb(220, 220, 220),
                 AutoScroll = true,
-                Anchor = AnchorStyles.Left | AnchorStyles.Top | AnchorStyles.Right // 不跟随底部拉伸
+                Anchor = AnchorStyles.Left | AnchorStyles.Top | AnchorStyles.Right
             };
 
             contentPanel.Controls.Add(listPanel);
@@ -276,31 +270,26 @@ namespace VideoConverter
             headerPanel.Width = ClientSize.Width;
             headerPanel.Height = 32;
 
-            // 保持拖拽区域不变
             dropPanel.Left = 0;
             dropPanel.Top = 32;
             dropPanel.Width = ClientSize.Width;
             dropPanel.Height = 468;
 
-            // 列表容器
             contentPanel.Left = 0;
-            contentPanel.Top = 32; // 保证在 headerPanel 下方
+            contentPanel.Top = 32;
             contentPanel.Width = ClientSize.Width;
             contentPanel.Height = 468;
 
-            // 列表填满底部按钮上方空间
             listPanel.Left = 0;
             listPanel.Top = 0;
             listPanel.Width = contentPanel.Width;
             listPanel.Height = Math.Max(0, contentPanel.Height - bottomPanel.Height);
             listPanel.Anchor = AnchorStyles.Left | AnchorStyles.Top | AnchorStyles.Right | AnchorStyles.Bottom;
-            listPanel.AutoScroll = true; // 确保开启
+            listPanel.AutoScroll = true;
 
-            // 底部条紧贴列表底部
             bottomPanel.Width = contentPanel.Width;
             bottomPanel.Top = listPanel.Bottom;
 
-            // 表头按钮右对齐
             btnStart.Left = headerPanel.Width - btnStart.Width - 8;
         }
 
@@ -427,14 +416,10 @@ namespace VideoConverter
 
         private void BtnImportMore_Click(object? sender, EventArgs e)
         {
-            if (_stage == AppStage.Transcoding) return; // 转码中不可导入
+            if (_stage == AppStage.Transcoding) return;
             if (openFileDialog.ShowDialog() == DialogResult.OK)
             {
-                // 不再清空，直接追加
                 AddFiles(openFileDialog.FileNames);
-
-                // 若仍处于导入模式（首次进入列表），AddFiles 内部已会切换布局
-                // 这里补一次布局以确保行位置刷新（可选）
                 if (!_importMode)
                     LayoutRows();
             }
@@ -475,12 +460,15 @@ namespace VideoConverter
             }
         }
 
+        private const int RowHeightBase = 54;
+        private const int RowSpacing = 8;
+
         private FileJob CreateJob(string inputPath)
         {
             var rowPanel = new UIPanel
             {
                 Width = listPanel.ClientSize.Width - 24,
-                Height = 45, // 每行 36px
+                Height = RowHeightBase,
                 Radius = 6,
                 FillColor = Color.White,
                 RectColor = Color.FromArgb(220, 220, 220)
@@ -489,7 +477,7 @@ namespace VideoConverter
             var picFile = new PictureBox
             {
                 Left = 10,
-                Top = 10, // 居中 16x16
+                Top = 10,
                 Width = 16,
                 Height = 16,
                 SizeMode = PictureBoxSizeMode.StretchImage,
@@ -509,42 +497,46 @@ namespace VideoConverter
 
             var bar = new UIProcessBar
             {
-                Left = lblName.Left,
-                Top = rowPanel.Height - 10, // 靠近底部
-                Width = rowPanel.Width - 220,
-                Height = 8, // 压缩为 8px
+                Left = 10,
+                Top = lblName.Bottom + 6,
+                Width = rowPanel.Width - 40,
+                Height = 12, // 调高以提升可见度
                 Maximum = 100,
                 Value = 0,
                 Visible = false,
                 StyleCustomMode = true,
-                FillColor = Color.FromArgb(229, 231, 235),
-                ForeColor = Color.FromArgb(34, 197, 94),
-                RectColor = Color.Transparent
+                FillColor = ProgressBarFillColor,   // 背景
+                ForeColor = ProgressBarForeColor,   // 前景（进度色）
+                RectColor = Color.Transparent        
             };
+            // 兼容可能存在的 ProcessColor 属性（不同版本 Sunny.UI）
+            TrySetProcessColor(bar, ProgressBarForeColor);
 
             var lblPercent = new UILabel
             {
-                Left = bar.Right + 10,
+                Left = bar.Right - 40,
                 Top = bar.Top - 1,
-                Width = 60,
-                Height = 16,
+                Width = 40,
+                Height = 14,
                 Text = "0%",
                 Font = new Font("微软雅黑", 8.5F, FontStyle.Bold),
                 ForeColor = Color.FromArgb(60, 63, 65),
-                Visible = false
+                Visible = false,
+                TextAlign = ContentAlignment.MiddleRight,
+                BackColor = Color.Transparent
             };
 
             var picStatus = new PictureBox
             {
                 Width = 16,
                 Height = 16,
-                Top = 10,
+                Top = 12,
                 SizeMode = PictureBoxSizeMode.StretchImage
             };
 
             var lblStatus = new UILabel
             {
-                Top = 8,
+                Top = 10,
                 Width = 80,
                 Height = 18,
                 Text = "等待中",
@@ -583,6 +575,15 @@ namespace VideoConverter
             return job;
         }
 
+        private static void TrySetProcessColor(UIProcessBar bar, Color color)
+        {
+            var prop = bar.GetType().GetProperty("ProcessColor");
+            if (prop != null && prop.CanWrite)
+            {
+                try { prop.SetValue(bar, color); } catch { }
+            }
+        }
+
         private void AddRow(FileJob job)
         {
             listPanel.Controls.Add(job.Row);
@@ -601,27 +602,47 @@ namespace VideoConverter
         {
             if (listPanel is null || listPanel.IsDisposed) return;
 
-            int y = 8; // 注意：不要再用 AutoScrollPosition.Y 抵消
+            int y = RowSpacing;
+            int innerRightPadding = 8;
+
             foreach (var job in _jobs)
             {
-                job.Row.Left = 8;
-                job.Row.Top = y;
-                job.Row.Width = listPanel.ClientSize.Width - 16;
+                var row = job.Row;
+                row.Left = 8;
+                row.Top = y;
+                row.Width = listPanel.ClientSize.Width - 16;
 
-                job.NameLabel.Width = job.Row.Width - 220;
-                job.Bar.Left = job.NameLabel.Left;
-                job.Bar.Width = job.Row.Width - 220;
-
-                int rightPadding = 8;
-                job.StatusLabel.Left = job.Row.Width - rightPadding - job.StatusLabel.Width;
+                // 右侧状态标签定位（保持宽度）
+                job.StatusLabel.Left = row.Width - innerRightPadding - job.StatusLabel.Width;
                 job.StatusIcon.Left = job.StatusLabel.Left - 4 - job.StatusIcon.Width;
 
-                job.PercentLabel.Left = job.Bar.Right + 10;
+                // 进度条：从文件图标左边（10）开始到状态图标前留 8px
+                int barLeft = job.LeftIcon.Left; // 10
+                int barRightLimit = job.StatusIcon.Left - 8;
+                int barWidth = Math.Max(50, barRightLimit - barLeft);
 
-                y += job.Row.Height + 8;
+                job.Bar.Left = barLeft;
+                job.Bar.Width = barWidth;
+
+                // 文件名宽度：从名称左到进度条右（或状态图标左 - 间距）
+                int nameRightLimit = barRightLimit;
+                job.NameLabel.Left = job.LeftIcon.Right + 8;
+                job.NameLabel.Width = Math.Max(40, nameRightLimit - job.NameLabel.Left);
+
+                // 进度条纵向：在文件名下方
+                job.Bar.Top = job.NameLabel.Bottom + 6;
+
+                // 百分比放在进度条右端内部（不挤出）
+                job.PercentLabel.Left = job.Bar.Left + job.Bar.Width - job.PercentLabel.Width;
+                job.PercentLabel.Top = job.Bar.Top - 1;
+
+                // 行高度根据进度条动态调整（底部留 8px）
+                int rowNeeded = job.Bar.Top + job.Bar.Height + 8;
+                row.Height = Math.Max(RowHeightBase, rowNeeded);
+
+                y += row.Height + RowSpacing;
             }
 
-            // 设置滚动最小尺寸以触发滚动条
             listPanel.AutoScrollMinSize = new Size(0, Math.Max(0, y));
         }
 
@@ -674,27 +695,25 @@ namespace VideoConverter
             if (targets.Count == 0)
             {
                 ResetHeaderAfterTranscode();
-                return;
             }
-
-            try
+            else
             {
-                var degree = Math.Max(1, _maxParallel);
-                await RunLimitedConcurrencyAsync(targets, degree, token).ConfigureAwait(false);
-            }
-            catch (OperationCanceledException)
-            {
-                // 用户取消
-            }
-            catch (Exception ex)
-            {
-                UIMessageBox.Show($"转码过程中出现错误：{ex.Message}", "错误");
-            }
-            finally
-            {
-                _cts?.Dispose();
-                _cts = null;
-                ResetHeaderAfterTranscode();
+                try
+                {
+                    var degree = Math.Max(1, _maxParallel);
+                    await RunLimitedConcurrencyAsync(targets, degree, token).ConfigureAwait(false);
+                }
+                catch (OperationCanceledException) { }
+                catch (Exception ex)
+                {
+                    UIMessageBox.Show($"转码过程中出现错误：{ex.Message}", "错误");
+                }
+                finally
+                {
+                    _cts?.Dispose();
+                    _cts = null;
+                    ResetHeaderAfterTranscode();
+                }
             }
         }
 
@@ -792,11 +811,14 @@ namespace VideoConverter
                 job.Bar.Visible = true;
                 job.PercentLabel.Text = "0%";
                 job.PercentLabel.Visible = true;
+                // 确保颜色（某些主题切换后）
+                job.Bar.ForeColor = ProgressBarForeColor;
+                TrySetProcessColor(job.Bar, ProgressBarForeColor);
             });
 
             try
             {
-                try { if (File.Exists(workPath)) File.Delete(workPath); } catch {}
+                try { if (File.Exists(workPath)) File.Delete(workPath); } catch { }
 
                 await _transcode.TranscodeAsync(
                     job.InputPath,
@@ -828,7 +850,7 @@ namespace VideoConverter
             }
             catch (OperationCanceledException)
             {
-                try { if (File.Exists(workPath)) File.Delete(workPath); } catch {}
+                try { if (File.Exists(workPath)) File.Delete(workPath); } catch { }
                 SafeUI(() =>
                 {
                     ApplyStatusStyle(job, "等待中");
@@ -838,7 +860,7 @@ namespace VideoConverter
             }
             catch (Exception ex)
             {
-                try { if (File.Exists(workPath)) File.Delete(workPath); } catch {}
+                try { if (File.Exists(workPath)) File.Delete(workPath); } catch { }
                 job.ErrorMessage = ex.ToString();
                 SafeUI(() => ApplyStatusStyle(job, "查看原因"));
             }
@@ -850,8 +872,15 @@ namespace VideoConverter
 
             if (progress.HasValue)
             {
-                job.Bar.Value = progress.Value;
-                job.PercentLabel.Text = $"{progress.Value}%";
+                var value = Math.Min(job.Bar.Maximum, Math.Max(0, progress.Value));
+                if (job.Bar.Value != value)
+                {
+                    job.Bar.Value = value;
+                    job.Bar.ForeColor = ProgressBarForeColor; // 保持颜色
+                    TrySetProcessColor(job.Bar, ProgressBarForeColor);
+                    job.Bar.Invalidate();
+                }
+                job.PercentLabel.Text = $"{value}%";
             }
             if (status != null)
             {
@@ -885,6 +914,8 @@ namespace VideoConverter
 
                     job.Bar.Visible = true;
                     job.PercentLabel.Visible = true;
+                    job.Bar.ForeColor = ProgressBarForeColor;
+                    TrySetProcessColor(job.Bar, ProgressBarForeColor);
                     break;
 
                 case "转码成功":
@@ -892,7 +923,6 @@ namespace VideoConverter
                     job.StatusLabel.ForeColor = Color.FromArgb(40, 167, 69);
                     job.StatusLabel.Cursor = Cursors.Default;
                     job.StatusIcon.Image = _images.IcoSuccess;
-
                     job.Bar.Visible = false;
                     job.PercentLabel.Visible = false;
                     job.Row.RectColor = Color.FromArgb(190, 230, 200);
@@ -904,7 +934,6 @@ namespace VideoConverter
                     job.StatusLabel.ForeColor = Color.FromArgb(14, 165, 233);
                     job.StatusLabel.Cursor = Cursors.Hand;
                     job.StatusIcon.Image = _images.IcoError;
-
                     job.Bar.Visible = false;
                     job.PercentLabel.Visible = false;
                     job.NameLabel.ForeColor = Color.FromArgb(239, 68, 68);
@@ -916,7 +945,6 @@ namespace VideoConverter
                     job.StatusLabel.ForeColor = Color.FromArgb(148, 163, 184);
                     job.StatusLabel.Cursor = Cursors.Default;
                     job.StatusIcon.Image = _images.IcoWaiting;
-
                     job.Bar.Visible = false;
                     job.PercentLabel.Visible = false;
                     break;
