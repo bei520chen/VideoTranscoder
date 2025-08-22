@@ -430,8 +430,13 @@ namespace VideoConverter
             if (_stage == AppStage.Transcoding) return; // 转码中不可导入
             if (openFileDialog.ShowDialog() == DialogResult.OK)
             {
-                ClearJobsAndList();
+                // 不再清空，直接追加
                 AddFiles(openFileDialog.FileNames);
+
+                // 若仍处于导入模式（首次进入列表），AddFiles 内部已会切换布局
+                // 这里补一次布局以确保行位置刷新（可选）
+                if (!_importMode)
+                    LayoutRows();
             }
         }
 
@@ -647,14 +652,16 @@ namespace VideoConverter
                 job.OutputPath = Path.Combine(_currentBatchDir, $"{name}_1080p.mp4");
             }
 
+            _cts?.Dispose();
             _cts = new CancellationTokenSource();
+            var token = _cts.Token;
+
             _stage = AppStage.Transcoding;
             btnStart.Text = "停止";
             btnStart.FillColor = Color.FromArgb(220, 38, 38);
             btnStart.FillHoverColor = ControlPaint.Light(Color.FromArgb(220, 38, 38));
             btnStart.FillPressColor = Color.FromArgb(220, 38, 38);
             btnStart.Enabled = true;
-
             btnImportMore.Enabled = false;
             btnUpload.Enabled = false;
 
@@ -665,32 +672,14 @@ namespace VideoConverter
                 return;
             }
 
-            var sem = new SemaphoreSlim(Math.Max(1, _maxParallel));
-            var running = new List<Task>();
-            foreach (var job in targets)
-            {
-                await sem.WaitAsync(_cts.Token).ConfigureAwait(false);
-                var t = Task.Run(async () =>
-                {
-                    try
-                    {
-                        await TranscodeOne(job, _cts.Token);
-                    }
-                    finally
-                    {
-                        sem.Release();
-                    }
-                }, _cts.Token);
-                running.Add(t);
-            }
-
             try
             {
-                await Task.WhenAll(running);
+                var degree = Math.Max(1, _maxParallel);
+                await RunLimitedConcurrencyAsync(targets, degree, token).ConfigureAwait(false);
             }
             catch (OperationCanceledException)
             {
-                // 用户取消
+                // 用户取消（正常吞掉）
             }
             catch (Exception ex)
             {
@@ -702,6 +691,44 @@ namespace VideoConverter
                 _cts = null;
                 ResetHeaderAfterTranscode();
             }
+        }
+
+        // 新增：固定 N 个工人并行执行，避免调度阶段抛取消异常
+        private Task RunLimitedConcurrencyAsync(List<FileJob> jobs, int degree, CancellationToken token)
+        {
+            if (jobs.Count == 0 || degree <= 0)
+                return Task.CompletedTask;
+
+            var queue = new System.Collections.Concurrent.ConcurrentQueue<FileJob>(jobs);
+            var workers = new List<Task>(degree);
+
+            for (int w = 0; w < degree; w++)
+            {
+                workers.Add(Task.Run(async () =>
+                {
+                    while (!token.IsCancellationRequested)
+                    {
+                        if (!queue.TryDequeue(out var job))
+                            break;
+
+                        try
+                        {
+                            await TranscodeOne(job, token).ConfigureAwait(false);
+                        }
+                        catch (OperationCanceledException)
+                        {
+                            break;
+                        }
+                        catch (Exception ex)
+                        {
+                            job.ErrorMessage = ex.ToString();
+                            SafeUI(() => ApplyStatusStyle(job, "查看原因"));
+                        }
+                    }
+                }));
+            }
+
+            return Task.WhenAll(workers);
         }
 
         private void ResetHeaderAfterTranscode()
