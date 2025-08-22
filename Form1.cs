@@ -480,7 +480,7 @@ namespace VideoConverter
             var rowPanel = new UIPanel
             {
                 Width = listPanel.ClientSize.Width - 24,
-                Height = 36, // 每行 36px
+                Height = 45, // 每行 36px
                 Radius = 6,
                 FillColor = Color.White,
                 RectColor = Color.FromArgb(220, 220, 220)
@@ -645,11 +645,16 @@ namespace VideoConverter
                 return;
             }
 
-            _currentBatchDir = BatchOutput.CreateBatchOutputDir();
+            // 仅首轮创建，后续复用（直到程序重启或你自行调用 ClearJobsAndList 重置）
+            if (string.IsNullOrEmpty(_currentBatchDir) || !Directory.Exists(_currentBatchDir))
+                _currentBatchDir = BatchOutput.CreateBatchOutputDir();
+
+            // 为当前待处理的任务生成（或更新）唯一输出文件
             foreach (var job in _jobs.Where(j => j.StatusLabel.Text is "等待中" or "查看原因" or "失败"))
             {
                 var name = Path.GetFileNameWithoutExtension(job.InputPath);
-                job.OutputPath = Path.Combine(_currentBatchDir, $"{name}_1080p.mp4");
+                var baseName = $"{name}_1080p";
+                job.OutputPath = GetUniqueOutputPath(_currentBatchDir!, baseName, ".mp4");
             }
 
             _cts?.Dispose();
@@ -679,7 +684,7 @@ namespace VideoConverter
             }
             catch (OperationCanceledException)
             {
-                // 用户取消（正常吞掉）
+                // 用户取消
             }
             catch (Exception ex)
             {
@@ -690,6 +695,23 @@ namespace VideoConverter
                 _cts?.Dispose();
                 _cts = null;
                 ResetHeaderAfterTranscode();
+            }
+        }
+
+        // 生成不重复的输出文件路径（目录内存在则递增后缀）
+        private static string GetUniqueOutputPath(string dir, string baseName, string ext)
+        {
+            var path = Path.Combine(dir, baseName + ext);
+            if (!File.Exists(path))
+                return path;
+
+            int i = 1;
+            while (true)
+            {
+                var candidate = Path.Combine(dir, $"{baseName}_{i}{ext}");
+                if (!File.Exists(candidate))
+                    return candidate;
+                i++;
             }
         }
 
@@ -757,6 +779,12 @@ namespace VideoConverter
         {
             if (job.StatusLabel.Text == "转码成功") return;
 
+            var finalPath = job.OutputPath;
+            // 临时文件：保证最后扩展仍是 .mp4
+            var dir = Path.GetDirectoryName(finalPath)!;
+            var fileNoExt = Path.GetFileNameWithoutExtension(finalPath);
+            var workPath = Path.Combine(dir, fileNoExt + ".__partial__.mp4");
+
             SafeUI(() =>
             {
                 ApplyStatusStyle(job, "转码中");
@@ -768,15 +796,28 @@ namespace VideoConverter
 
             try
             {
+                try { if (File.Exists(workPath)) File.Delete(workPath); } catch {}
+
                 await _transcode.TranscodeAsync(
                     job.InputPath,
-                    job.OutputPath,
+                    workPath,
                     token,
                     percent =>
                     {
                         var p = Math.Max(0, Math.Min(100, percent));
                         SafeUI(() => UpdateRow(job, progress: p));
                     });
+
+                try
+                {
+                    if (File.Exists(finalPath))
+                        File.Delete(finalPath);
+                    File.Move(workPath, finalPath);
+                }
+                catch (Exception mvEx)
+                {
+                    throw new IOException($"输出文件重命名失败: {mvEx.Message}", mvEx);
+                }
 
                 SafeUI(() =>
                 {
@@ -787,6 +828,7 @@ namespace VideoConverter
             }
             catch (OperationCanceledException)
             {
+                try { if (File.Exists(workPath)) File.Delete(workPath); } catch {}
                 SafeUI(() =>
                 {
                     ApplyStatusStyle(job, "等待中");
@@ -796,6 +838,7 @@ namespace VideoConverter
             }
             catch (Exception ex)
             {
+                try { if (File.Exists(workPath)) File.Delete(workPath); } catch {}
                 job.ErrorMessage = ex.ToString();
                 SafeUI(() => ApplyStatusStyle(job, "查看原因"));
             }
